@@ -1,0 +1,137 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper: Verify if request is from an authorized admin account
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.admin == true ||
+        request.auth.token.email == 'gulesh788@gmail.com' ||
+        request.auth.token.email == 'leovantage059@gmail.com' ||
+        request.auth.token.email.matches('.*@leovantage\\.com$') ||
+        exists(/databases/$(database)/documents/admin_users/$(request.auth.uid)) ||
+        (request.auth.token.email != null && exists(/databases/$(database)/documents/admin_allowlist/$(request.auth.token.email)))
+      );
+    }
+
+    // Public readable content: only 'Published' status visible to visitors; full access to admins
+    match /projects/{projectId} {
+      allow read: if (resource != null && resource.data.status == 'Published') || isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /services/{serviceId} {
+      allow read: if (resource != null && resource.data.status == 'Published' && resource.data.visibility == true) || isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /pricing_packages/{packageId} {
+      allow read: if (resource != null && resource.data.status == 'Published') || isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /team_members/{memberId} {
+      // Public visitors can only view published profiles without internal financial/rate notes
+      allow read: if (resource != null && resource.data.status == 'Published' && resource.data.visibility == true) || isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /reviews/{reviewId} {
+      allow read: if (resource != null && resource.data.status == 'Published') || isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /faqs/{faqId} {
+      allow read: if (resource != null && resource.data.status == 'Published') || isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /process_steps/{stepId} {
+      allow read: if (resource != null && resource.data.status == 'Published') || isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /site_hero/{heroDoc} {
+      allow read: if (resource != null && resource.data.visibility == true) || isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /site_settings/{settingDoc} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Contact Inquiries: Visitors can submit (create) with strict validation; reading/editing restricted to Admins
+    match /inquiries/{inquiryId} {
+      allow read, update, delete: if isAdmin();
+      allow create: if request.resource.data.name is string &&
+                       request.resource.data.name.size() >= 2 &&
+                       request.resource.data.name.size() <= 100 &&
+                       request.resource.data.email is string &&
+                       request.resource.data.email.matches('^[^@]+@[^@]+\\.[^@]+$') &&
+                       request.resource.data.service is string &&
+                       request.resource.data.status == 'New' &&
+                       (!('notes' in request.resource.data) || request.resource.data.notes.size() == 0);
+    }
+
+    // Internal Agency Business Collections (Strictly Admins only)
+    match /clients/{clientId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /delivery_projects/{projId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /documents/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /notes/{noteId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /call_records/{callId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /invoices/{invId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /expenses/{expId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /tasks/{taskId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /social_posts/{postId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /content_items/{itemId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /admin_users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow write: if isAdmin();
+    }
+
+    match /admin_allowlist/{email} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Fallback: Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

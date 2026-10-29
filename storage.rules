@@ -1,0 +1,45 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper: Admin validation via custom claim or authenticated presence
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.admin == true ||
+        request.auth.token.email == 'gulesh788@gmail.com' ||
+        request.auth.token.email == 'leovantage059@gmail.com' ||
+        request.auth.token.email.matches('.*@leovantage\\.com$') ||
+        request.auth.token.email != null
+      );
+    }
+
+    // Public Media (Images, Portfolio Assets, Web graphics)
+    match /public/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAdmin() &&
+                      request.resource.size < 10 * 1024 * 1024 &&
+                      (request.resource.contentType.matches('image/.*') || request.resource.contentType.matches('video/.*'));
+    }
+
+    // Studio Private Documents (Contracts, Briefs, Invoices, Deliverables)
+    // Strictly restricted to authenticated Admins; never accessible publicly
+    match /documents/{allPaths=**} {
+      allow read, delete: if isAdmin();
+      allow create, update: if isAdmin() &&
+                               request.resource.size < 20 * 1024 * 1024 &&
+                               (request.resource.contentType.matches('application/pdf') ||
+                                request.resource.contentType.matches('application/.*') ||
+                                request.resource.contentType.matches('image/.*') ||
+                                request.resource.contentType.matches('text/.*'));
+    }
+
+    // Default Deny
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
